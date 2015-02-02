@@ -44,7 +44,7 @@ class Radiation:
 
     """ 
         blocking read operation from serial
-        @return: (time,CPM,uSv/h,V)
+        @return: (time,c/m,uSv/h,V)
     """
     def read_val(self):
         valid = False
