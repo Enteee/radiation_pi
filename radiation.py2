@@ -4,16 +4,22 @@ import sys
 import serial
 import time
 import re
+import gc
 import datetime
+from io import open
 import numpy as np
+import matplotlib
+
+# Force matplotlib to not use any Xwindows backend.
+matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 import matplotlib.dates as dates
-from io import open
 
 DEFAULT_TTY = u'/dev/ttyUSB0'
 BAUD = 9600
-DATA_FILE = u'/tmp/data'
-PLOTFILE = u'/tmp/plot'
+DATA_FILE = u'/usr/share/nginx/www/data'
+PLOTFILE = u'/usr/share/nginx/www/plot.png'
 
 class Radiation(object):
     def __init__(self,argv=sys.argv):
@@ -34,14 +40,16 @@ class Radiation(object):
         # read data from file
         for d in self.data:
             print d
+        i = 0
         while True:
-            if len(self.data) > 0:
+            if len(self.data) > 0 and i % 10 == 0:
                 # plot 
                 self.plot(self.data)
             # get new data
             d = self.read_val()
             self.fd.write(u"{},{},{},{}\n".format(*d))
             self.data.append(d)
+            i = i + 1
 
     u""" 
         blocking read operation from serial
@@ -98,6 +106,9 @@ class Radiation(object):
         fig.set_size_inches(16,8)
         fig.savefig(PLOTFILE)
         #plt.show()
+	fig.clf()
+	plt.close()
+	gc.collect()
 
 # Init a tester
 def main(argv=sys.argv):
