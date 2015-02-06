@@ -18,8 +18,9 @@ import matplotlib.dates as dates
 
 DEFAULT_TTY = u'/dev/ttyUSB0'
 BAUD = 9600
-DATA_FILE = u'/usr/share/nginx/www/data'
-PLOTFILE = u'/usr/share/nginx/www/plot.png'
+DATA_FILE = u'data'
+PLOTFILE = u'plot.png'
+PLOT_HOURS_DELTA = 6
 
 class Radiation(object):
     def __init__(self,argv=sys.argv):
@@ -28,7 +29,7 @@ class Radiation(object):
         except IndexError:
             self.tty = DEFAULT_TTY
         self.baud = BAUD
-        self.ser = serial.Serial(self.tty,self.baud)
+        #self.ser = serial.Serial(self.tty,self.baud)
         self.data = []
         if os.path.exists(DATA_FILE):
             self.fd = open(DATA_FILE, u"r+", buffering=1)
@@ -41,7 +42,10 @@ class Radiation(object):
         for d in self.data:
             print d
         i = 0
-        while True:
+
+        self.plot()
+
+        while False:
             if len(self.data) > 0 and i % 10 == 0:
                 # plot 
                 self.plot(self.data)
@@ -68,47 +72,105 @@ class Radiation(object):
         data = [ float(d) for d in data ]
         data.insert(0 , time.time()) 
         return tuple(data)
-            
 
-    def plot(self, data):
-        # generate data
-        t = [ datetime.datetime.fromtimestamp(d[0]) for d in data ]
-        c_m = [ d[1] for d in data ]
-        uSv_h = [ d[2] for d in data ]
-        v = [ d[3] for d in data ]
-        # plot
-        fig, (ax1,ax2) = plt.subplots(nrows = 2,sharex = True)
+    def plot(self):
+        # filter range of last X hours
+        ( r__t, r__c_m, r__uSv_h, r__v ) = self._data_range(datetime.datetime.now() - datetime.timedelta(hours = PLOT_HOURS_DELTA))
+        # plot prep
+        fig, (ax1, ax2, ax3, ax4) = plt.subplots(nrows = 4)
         ax1t = ax1.twinx()
+        ax1.plot(r__t, r__c_m, u'bo')
+        ax1t.plot(r__t, r__uSv_h, u'r--')
+        # voltage
+        ax2.plot(r__t, r__v, u'g-o')
+        # 5h
+        (b_data__5h, b_labels__5h) = self._data_boxplot(12, 5, u'%a %H:%M')
+        ax3.boxplot(b_data__5h)
+        # 24h
+        (b_data__24h, b_labels__24h) = self._data_boxplot(12, 24, u'%d %b')
+        ax4.boxplot(b_data__24h)
+        # labels / axis
+        # 1 1
         ax1.set_ylabel(u'c/m', color=u'b')
-        ax1t.set_ylabel(u'uSv/h', color=u'r')
-        ax1.grid(True)
-        ax2.set_ylabel(u'V',color=u'g')
-        ax2.grid(True)
-        # x-axis
-        ax1.xaxis_date()
-        ax2.xaxis_date()
-        ax2.xaxis.set_major_locator(dates.AutoDateLocator(maxticks=8))
-        ax2.xaxis.set_major_formatter(dates.DateFormatter(u'%Y %m %d %H:%M:%S'))
-        ax2.set_xlabel(u'datetime')
-        # Make the y-axis label and tick labels match the line color.
-        ax1.plot(t, c_m, u'bo')
         for tl in ax1.get_yticklabels():
             tl.set_color(u'b')
-        ax1t.plot(t, uSv_h, u'r--')
+        ax1t.set_ylabel(u'uSv/h', color=u'r')
         for tl in ax1t.get_yticklabels():
             tl.set_color(u'r')
-        # voltage
-        ax2.plot(t, v, u'g-o')
-        # Make the y-axis label and tick labels match the line color.
+        ax1.xaxis_date()
+        ax1.xaxis.set_major_locator(dates.AutoDateLocator(maxticks=10))
+        ax1.xaxis.set_major_formatter(dates.DateFormatter(u'%H:%M'))
+        ax1.set_xlabel(u'datetime')
+        ax1.grid(True)
+        # 2 1
+        ax2.set_ylabel(u'V',color=u'g')
         for tl in ax2.get_yticklabels():
             tl.set_color(u'g')
+        ax2.xaxis_date()
+        ax2.xaxis.set_major_locator(dates.AutoDateLocator(maxticks=10))
+        ax2.xaxis.set_major_formatter(dates.DateFormatter(u'%H:%M'))
+        ax2.set_xlabel(u'datetime')
+        ax2.grid(True)
+        # 3 1
+        ax3.set_ylabel(u'c/m', color=u'b')
+        for tl in ax3.get_yticklabels():
+            tl.set_color(u'b')
+        ax3.xaxis_date()
+        ax3.set_xticklabels(b_labels__5h)
+        ax3.set_xlabel(u'5h boxplots')
+        ax3.yaxis.grid(True)
+        # 4 1
+        ax4.set_ylabel(u'c/m', color=u'b')
+        for tl in ax4.get_yticklabels():
+            tl.set_color(u'b')
+        ax4.xaxis_date()
+        ax4.set_xticklabels(b_labels__24h)
+        ax4.set_xlabel(u'24h boxplots')
+        ax4.yaxis.grid(True)
         # figure setup
-        fig.set_size_inches(16,8)
+        fig.set_size_inches(16,16)
+        fig.subplots_adjust(left = 0.05, right = 0.95, top = 0.95 , bottom = 0.05)
         fig.savefig(PLOTFILE)
         #plt.show()
-	fig.clf()
-	plt.close()
-	gc.collect()
+        fig.clf()
+        plt.close()
+        gc.collect()
+
+    def _data_range(self, start, end = None):
+        # generate data
+        t = [ datetime.datetime.fromtimestamp(d[0]) for d in self.data ]
+        c_m = [ d[1] for d in self.data ]
+        uSv_h = [ d[2] for d in self.data ]
+        v = [ d[3] for d in self.data ]
+        r__t = []
+        r__c_m = []
+        r__uSv_h = []
+        r__v = []
+        for i in range(len(t)):
+            if t[i] >= start:
+                if end is None or t[i] <= end:
+                    r__t.append(t[i])
+                    r__c_m.append(c_m[i])
+                    r__uSv_h.append(uSv_h[i])
+                    r__v.append(v[i])
+        return (r__t, r__c_m, r__uSv_h, r__v)
+
+    def _data_boxplot(self, count, width, formatstr):
+        boxplot_data_c = count
+        boxplot_bin_widt__h = width
+        boxplot_data = []
+        boxplot_data_labels = []
+        for i in reversed(range(boxplot_data_c)):
+            now = datetime.datetime.now()
+            start = now - datetime.timedelta(hours = (i + 1) * boxplot_bin_widt__h )
+            end = now - datetime.timedelta(hours = i * boxplot_bin_widt__h)
+            mid = start + datetime.timedelta(hours = boxplot_bin_widt__h / 2)
+            boxplot_data.append(self._data_range(
+                    start,
+                    end,
+                )[1])
+            boxplot_data_labels.append(mid.strftime(formatstr))
+        return (boxplot_data, boxplot_data_labels)
 
 # Init a tester
 def main(argv=sys.argv):
