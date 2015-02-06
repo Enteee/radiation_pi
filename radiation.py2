@@ -43,9 +43,7 @@ class Radiation(object):
             print d
         i = 0
 
-        self.plot()
-
-        while False:
+        while True:
             if len(self.data) > 0 and i % 10 == 0:
                 # plot 
                 self.plot(self.data)
