@@ -29,13 +29,16 @@ class Radiation(object):
         except IndexError:
             self.tty = DEFAULT_TTY
         self.baud = BAUD
-        #self.ser = serial.Serial(self.tty,self.baud)
+        self.ser = serial.Serial(self.tty,self.baud)
         self.data = []
         if os.path.exists(DATA_FILE):
             self.fd = open(DATA_FILE, u"r+", buffering=1)
             for line in self.fd:
-                d = tuple([ float(l) for l in line.split(u',') ])
-                self.data.append(d)
+                try:
+                    d = tuple([ float(l) for l in line.split(u',') ])
+                    self.data.append(d)
+                except ValueError:
+                    pass
         else:
             self.fd = open(DATA_FILE, u"w", buffering=1)
         # read data from file
@@ -46,7 +49,7 @@ class Radiation(object):
         while True:
             if len(self.data) > 0 and i % 10 == 0:
                 # plot 
-                self.plot(self.data)
+                self.plot()
             # get new data
             d = self.read_val()
             self.fd.write(u"{},{},{},{}\n".format(*d))

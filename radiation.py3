@@ -26,8 +26,11 @@ class Radiation:
         if os.path.exists(DATA_FILE):
             self.fd = open(DATA_FILE, "r+", buffering=1)
             for line in self.fd:
-                d = tuple([ float(l) for l in line.split(',') ])
-                self.data.append(d)
+                try:
+                    d = tuple([ float(l) for l in line.split(',') ])
+                    self.data.append(d)
+                except ValueError:
+                    pass
         else:
             self.fd = open(DATA_FILE, "w", buffering=1)
         # read data from file
